@@ -166,7 +166,8 @@ with gr.Blocks(title="Cinematchr: AI Movie Recommender") as demo:
         
 # TAB 1: Core Filtering
         with gr.TabItem("🔍 Advanced Filters"):
-            gr.Markdown("### Core Filtering Capabilities")
+            gr.Markdown("### Advanced Filtering Capabilities")
+            gr.Markdown("Adjust the filters to find movies that match your criteria.")
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("**Temporal & Quality**")
@@ -211,7 +212,7 @@ with gr.Blocks(title="Cinematchr: AI Movie Recommender") as demo:
 
         # TAB 2: Recommendations
         with gr.TabItem("🤝 Movie Matchmaker"):
-            gr.Markdown("### Get Recommendations based on a movie you love!")
+            gr.Markdown("### Get recommendations based on a movie you love!")
             with gr.Row():
                 with gr.Column():
                     target_movie = gr.Textbox(label="Enter a Movie Title (e.g., Inception)")

@@ -4,3 +4,5 @@ requests
 scikit-learn
 python-dotenv
 matplotlib
+pandas
+numpy
