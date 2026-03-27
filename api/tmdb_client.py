@@ -79,32 +79,45 @@ def get_movie_details(movie_id):
         print(f"Error fetching details for ID {movie_id}: {response.status_code}")
         return None
 
-def discover_filtered_movies(filters: dict):
+def discover_filtered_movies(filters: dict, max_pages=3):
     """
     Fetches movies based on specific criteria (genres, years, ratings).
-    This will power the 'Core Filtering Capabilities' required by the rubric.
+    Accommodates pagination to fetch more than just the top 20 results.
     """
     url = f"{BASE_URL}/discover/movie"
     
+    # Base parameters that should always be applied
     params = {
         "api_key": TMDB_API_KEY,
         "include_adult": "false",
-        # Changed from popularity.desc to vote_average.desc
-        # Returns unknown movies with high ratings.
         "sort_by": "vote_average.desc" 
     }
     
-    # Merge the base params with any specific filters passed in
-    # (e.g., {"primary_release_year": 2023, "with_genres": "28"})
+    # Merge the base params with any specific filters passed in from the UI
     params.update(filters)
     
-    response = requests.get(url, headers=get_headers(), params=params)
+    all_movies = []
     
-    if response.status_code == 200:
-        return response.json().get("results", [])
-    else:
-        print(f"Error discovering movies: {response.status_code}")
-        return []
+    # Loop through multiple pages to gather a larger pool of movies (3 pages = 60 movies)
+    for page in range(1, max_pages + 1):
+        params["page"] = page  # Tell the API exactly which page to fetch
+        
+        response = requests.get(url, headers=get_headers(), params=params)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Add this page's movies to our master list
+            all_movies.extend(data.get("results", []))
+            
+            # Safety check: If TMDB says there are no more pages left, stop looping early
+            if page >= data.get("total_pages", 1):
+                break
+        else:
+            print(f"Error discovering movies on page {page}: {response.status_code}")
+            break # Stop looping if the API throws an error
+            
+    return all_movies
 
 def get_person_id(name: str):
     """Searches TMDB for an actor/director and returns their unique integer ID."""

@@ -48,7 +48,7 @@ def build_discover_params(
     if genres:
         if isinstance(genres, list):
             genre_ids = [str(GENRE_MAP[g]) for g in genres if g in GENRE_MAP]
-            params["with_genres"] = ",".join(genre_ids) # The comma acts as an OR operator
+            params["with_genres"] = "|".join(genre_ids) # The pipe acts as an OR operator
         elif isinstance(genres, str) and genres in GENRE_MAP:
             params["with_genres"] = str(GENRE_MAP[genres])
             
@@ -84,6 +84,6 @@ def format_filter_results(movie_list):
         rating = movie.get('vote_average', 0)
         votes = movie.get('vote_count', 0)
         
-        formatted_results.append(f"{idx}. {make_bold(title)} ({make_bold(year)}) - ⭐ {rating}/10 ({votes} votes)")
-        
+        formatted_results.append(f"{idx}. {make_bold(title)} ({make_bold(year)}) - ⭐ {make_bold(f'{rating}/10')} ({votes} votes)")        
+    
     return "\n".join(formatted_results)

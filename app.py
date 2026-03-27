@@ -1,5 +1,5 @@
 import gradio as gr
-
+from utils.formatting import make_bold
 # Importing our actual backend logic!
 from api.tmdb_client import discover_filtered_movies, search_movies, get_movie_details, get_trending_movies, get_person_id
 from utils.filters import build_discover_params, format_filter_results
@@ -7,6 +7,7 @@ from utils.data_processor import build_detailed_movie_pool, format_movie_for_ui
 from recommender.content_based import get_content_recommendations
 from recommender.sentiment_nlp import search_by_vibe
 from recommender.hybrid_engine import get_hybrid_recommendations
+import base64
 import matplotlib
 matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
@@ -84,7 +85,7 @@ def recommend_movies(movie_name, algorithm):
     
     for idx, (movie, exp) in enumerate(raw_recs, 1):
         results_text += f"{idx}. {format_movie_for_ui(movie)}\n"
-        explanations_text += f"{idx}. {movie.get('title')}: {exp}\n"
+        explanations_text += f"{idx}. {make_bold(movie.get('title'))} | {exp}\n"
         
     return results_text, explanations_text
 
@@ -151,16 +152,41 @@ def generate_trend_plot():
     
     return fig
 
+def get_base64_image(image_path):
+    """Converts an image file to a base64 string so it can be embedded directly in HTML."""
+    try:
+        with open(image_path, "rb") as img_file:
+            encoded_string = base64.b64encode(img_file.read()).decode("utf-8")
+            return f"data:image/png;base64,{encoded_string}"
+    except Exception as e:
+        print(f"Warning: Could not load logo - {e}")
+        return ""
+
+# Generate the string once when the app starts
+LOGO_HTML = get_base64_image("images/logo.png")
+
 # --- GRADIO UI LAYOUT ---
 
 my_theme = gr.themes.Ocean(
-    font=[gr.themes.GoogleFont("Inconsolata"), "Arial", "sans-serif"]
+    font=[gr.themes.GoogleFont("Montserrat"), "Arial", "sans-serif"]  
 )
 
 with gr.Blocks(title="Cinematchr: AI Movie Recommender") as demo:
-    
-    gr.Markdown("# 🎬 Cinematchr")
-    gr.Markdown("Discover your next favorite film using metadata, collaborative signals, and natural language processing.")
+    # We use an f-string to inject the base64 image data directly into the src attribute!
+    # Combined into one block and wrapped in a styled HTML div!
+    gr.Markdown(
+        f"""
+        <div style="background: linear-gradient(to right, #a7f3d0 0%, #d1fae5 100%); padding: 20px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #6ee7b7;">
+            <h1 style="margin-top: 0; color: #000000; font-size: 2.5em;"> 
+                <img src="{LOGO_HTML}" style="height: 1.2em; display: inline-block; vertical-align: middle; margin-right: 10px;" /> 
+                Cinematchr 
+            </h1>
+            <p style="margin-bottom: 0; font-size: 1.25em; color: #000000;">
+                Discover your next favorite film using metadata, collaborative signals, and natural language processing.
+            </p>
+        </div>
+        """
+    )
     
     with gr.Tabs():
         
@@ -174,7 +200,7 @@ with gr.Blocks(title="Cinematchr: AI Movie Recommender") as demo:
                     year_start = gr.Slider(minimum=1920, maximum=2026, value=1990, step=1, label="Start Year")
                     year_end = gr.Slider(minimum=1920, maximum=2026, value=2024, step=1, label="End Year")
                     rating_slider = gr.Slider(minimum=0, maximum=10, value=7.0, step=0.5, label="Minimum Rating")
-                    vote_slider = gr.Slider(minimum=0, maximum=10000, value=100, step=50, label="Minimum Vote Count")
+                    vote_slider = gr.Slider(minimum=0, maximum=30000, value=1000, step=50, label="Minimum Vote Count")
                     
                     gr.Markdown("**Content Specifications**")
                     runtime_start = gr.Slider(minimum=0, maximum=300, value=60, step=10, label="Min Runtime (mins)")
@@ -195,19 +221,65 @@ with gr.Blocks(title="Cinematchr: AI Movie Recommender") as demo:
                         label="Select Genres (Combines with OR)",
                         multiselect=True # This satisfies the "logical operators" requirement!
                     )
-                    
-
 
                     filter_btn = gr.Button("Apply Filters", variant="primary")
+
+                    reset_btn = gr.ClearButton(
+                            
+                            value="Reset Filters",
+                            components=[
+                                year_start, 
+                                year_end, 
+                                rating_slider, 
+                                vote_slider, 
+                                runtime_start, 
+                                runtime_end, 
+                                cert_dropdown, 
+                                lang_dropdown, 
+                                genre_dropdown, 
+                                personnel_input 
+                            ]
+                        )
                 
                 with gr.Column():
                     filter_results = gr.Textbox(label="Results", lines=20)
             
             # Wire up all the new inputs to the button
+            # Fixed the order here: genre_dropdown MUST come before personnel_input!
             filter_btn.click(
                 fn=filter_movies, 
-                inputs=[year_start, year_end, rating_slider, vote_slider, runtime_start, runtime_end, cert_dropdown, lang_dropdown, personnel_input, genre_dropdown], 
+                inputs=[year_start, year_end, rating_slider, vote_slider, runtime_start, runtime_end, cert_dropdown, lang_dropdown, genre_dropdown, personnel_input], 
                 outputs=filter_results
+            )
+
+            # Wire up all the new inputs to the button
+            filter_btn.click(
+                fn=filter_movies, 
+                inputs=[year_start, year_end, rating_slider, vote_slider, runtime_start, runtime_end, cert_dropdown, lang_dropdown, genre_dropdown, personnel_input], 
+                outputs=filter_results
+            )
+
+            # Custom function to snap everything back to original defaults
+            def reset_all_filters():
+                return (
+                    1990,   # year_start default
+                    2024,   # year_end default
+                    7.0,    # rating_slider default
+                    1000,    # vote_slider default
+                    60,     # runtime_start default
+                    180,    # runtime_end default
+                    "Any",   # cert_dropdown default
+                    "Any",   # lang_dropdown default
+                    [],     # genre_dropdown default (empty list for multiselect)
+                    "",     # personnel_input default (empty string)
+                    ""      # filter_results default (clears the box)
+                )
+
+            # Wire the custom reset function to the button
+            reset_btn.click(
+                fn=reset_all_filters, 
+                inputs=[], 
+                outputs=[year_start, year_end, rating_slider, vote_slider, runtime_start, runtime_end, cert_dropdown, lang_dropdown, genre_dropdown, personnel_input, filter_results]
             )
 
         # TAB 2: Recommendations
